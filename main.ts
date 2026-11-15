@@ -4,10 +4,16 @@
 //   - Entry (flat only, full cash): the close is at least 1.2% below its
 //     30-bar EMA, OR at least 2.5% below the 60-bar high. Both are the same
 //     idea seen two ways: price has fallen fast, so a bounce is worth more
-//     than the ~26 bps a full-size round trip costs.
-//   - Exit (whole position): a 1% trailing stop from the highest close since
+//     than the ~26 bps a full-size round trip costs. The entry bar must also
+//     close UP on the previous close: never catch a falling knife mid-plunge,
+//     wait for the first uptick that the selloff is pausing. On the dev
+//     window this drops the marginal ~breakeven trade and leaves only the
+//     deep-dip entries.
+//   - Exit (whole position): a 0.8% trailing stop from the highest close since
 //     entry, or a hard stop at 1.5% below cost. No take-profit target: the
 //     trailing stop lets a real rally run and cuts it only when it turns.
+//     The 0.8% trail (tighter than v1's 1%) banks bounces sooner in a choppy
+//     market instead of giving the gain back while waiting for a turn.
 //   - Long only, one position, at most one order per reply. Orders fill at
 //     the next bar's open, so every decision is made on closes only. No new
 //     entries in the final 10 bars: a buy there would be flattened at the
@@ -27,7 +33,7 @@ const EMA_SPAN = 30;
 const HIGH_LOOKBACK = 60;
 const DIP_VS_EMA = 0.012; // entry: close 1.2% below the 30-bar EMA
 const DIP_VS_HIGH = 0.025; // entry: close 2.5% below the 60-bar high
-const TRAIL = 0.01; // exit: 1% below the peak close since entry
+const TRAIL = 0.008; // exit: 0.8% below the peak close since entry
 const HARD_STOP = 0.015; // exit: position worth 1.5% under its cost
 const MAX_SLIPPAGE_BPS = 150;
 // A buy decided this late would fill at the second-to-last bar's open and be
@@ -77,8 +83,8 @@ await runBars({
       if (value * 1000n <= held.cost * 985n) {
         return [{ side: 'sell', symbol: SYMBOL, qty: held.qty, max_slippage_bps: MAX_SLIPPAGE_BPS } satisfies SellInput];
       }
-      // close <= peak * (1 - TRAIL): close * 100 <= peak * 99
-      if (BigInt(close) * 100n <= BigInt(peakSinceEntry) * 99n) {
+      // close <= peak * (1 - TRAIL): close * 1000 <= peak * 992
+      if (BigInt(close) * 1000n <= BigInt(peakSinceEntry) * 992n) {
         return [{ side: 'sell', symbol: SYMBOL, qty: held.qty, max_slippage_bps: MAX_SLIPPAGE_BPS } satisfies SellInput];
       }
       return [];
@@ -98,6 +104,9 @@ await runBars({
       dipVsHigh = close <= high * (1 - DIP_VS_HIGH);
     }
     if (!dipVsEma && !dipVsHigh) return [];
+    // The selloff must be pausing: this bar closed up on the previous one.
+    // A dip signal on a still-falling bar is a falling knife, not a bounce.
+    if (closes.length < 2 || close <= closes[closes.length - 2]) return [];
     const cash = state.cash;
     if (cash < BigInt(state.hello.fees.min_notional_quote_units)) return [];
     return [{ side: 'buy', symbol: SYMBOL, notional_quote_units: cash, max_slippage_bps: MAX_SLIPPAGE_BPS } satisfies BuyInput];
