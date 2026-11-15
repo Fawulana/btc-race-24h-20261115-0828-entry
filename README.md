@@ -19,10 +19,12 @@ Buy the sharp selloff, ride the bounce with a trailing stop.
   still falling. Both are the same idea seen two ways: price has fallen
   fast, so a bounce is worth more than the ~26 bps a full-size round trip
   costs in fees, slippage and impact.
-- **Exit** (whole position): a 0.8% trailing stop from the highest close since
-  entry, or a hard stop at 1.5% below cost. No take-profit target: the
-  trailing stop lets a real rally run and cuts it only when it turns. The
-  tighter 0.8% trail (v1 used 1%) banks bounces sooner in a choppy market.
+- **Exit** (whole position): a 0.5% trailing stop from the highest close since
+  entry, or a hard stop at 1.5% below cost. The trail fires only when the
+  close has sat at least 0.5% below the peak for two consecutive closes:
+  one-minute closes are noisy and a single bar under the trail is usually
+  noise, not a turn. No take-profit target: the trailing stop lets a real
+  rally run and cuts it only when it turns. (v2 used a 0.8% one-bar trail.)
 - No new entries in the final 10 bars of the window.
 
 ## Why this shape
@@ -40,11 +42,11 @@ Float64 EMA and rolling high over closes only; no randomness, no wall
 clock, no environment, no files. Two runs on the same data produce
 identical action logs (verified with the kit's local grader).
 
-## Local dev grade (v2, verified with the exact process driver, two runs)
+## Local dev grade (v3, verified with the exact process driver, two runs)
 
-- Net PnL: **+28.4287 USDC**
-- Trades: 4, max drawdown: 1.64%, fees: 1.6039 USDC
-- Net PnL at 2x fees: +26.7901 USDC
+- Net PnL: **+34.4253 USDC** (v2: +28.4287)
+- Trades: 4, max drawdown: 1.27% (v2: 1.64%), fees: 1.6093 USDC
+- Net PnL at 2x fees: +32.7771 USDC (v2: +26.7901)
 - Guardrails met; two runs produced byte-identical action logs.
 
 ## Files
